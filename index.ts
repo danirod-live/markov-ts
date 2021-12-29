@@ -72,6 +72,16 @@ async function generateChain(
   return chain.makeChain();
 }
 
+async function generateAnyChain(database: Database): Promise<string> {
+  const content = await database.all(`SELECT content FROM chains`);
+  const messages = content.map((c) => c.content);
+  const chain = new MarkovGen({
+    input: messages,
+    minLength: 10,
+  });
+  return chain.makeChain();
+}
+
 if (!process.env.BOT_TOKEN) {
   console.error("Missing config");
   process.exit(1);
@@ -107,6 +117,21 @@ openDatabase().then((db) => {
         const target = param ? String(param.value) : i.user.id;
         console.log(target);
         const markov = await generateChain(db, target);
+        i.followUp(markov);
+      } catch (e) {
+        const messages = [
+          "[El bot te mira con desaprobación]",
+          "[El bot se te queda mirando sin decir nada]",
+          "[El bot mira tus manos, pero finalmente no dice nada]",
+          "[La IA del bot te mira como preguntándose quién eres]",
+        ];
+        const message = messages[Math.floor(Math.random() * messages.length)];
+        i.followUp(message);
+      }
+    } else if (i.isApplicationCommand() && i.commandName === "markov-all") {
+      await i.deferReply();
+      try {
+        const markov = await generateAnyChain(db);
         i.followUp(markov);
       } catch (e) {
         const messages = [
