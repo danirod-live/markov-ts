@@ -65,21 +65,27 @@ async function generateChain(
     author
   );
   const messages = content.map((c) => c.content);
+  return extractChain(messages);
+}
+
+function extractChain(corpus: string[]) {
   const chain = new MarkovGen({
-    input: messages,
+    input: corpus,
     minLength: 10,
   });
-  return chain.makeChain();
+  const output: string = chain.makeChain();
+  const outputWithoutLineBreaks = output.replace(/(\r\n|\n|\r)/gm, " ");
+  if (outputWithoutLineBreaks.length > 300) {
+    const space = outputWithoutLineBreaks.indexOf(" ", 300);
+    return outputWithoutLineBreaks.substring(0, space);
+  }
+  return outputWithoutLineBreaks;
 }
 
 async function generateAnyChain(database: Database): Promise<string> {
   const content = await database.all(`SELECT content FROM chains`);
   const messages = content.map((c) => c.content);
-  const chain = new MarkovGen({
-    input: messages,
-    minLength: 10,
-  });
-  return chain.makeChain();
+  return extractChain(messages);
 }
 
 if (!process.env.BOT_TOKEN) {
