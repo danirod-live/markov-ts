@@ -1,0 +1,4 @@
+.env
+index.js
+node_modules
+chains.sqlite

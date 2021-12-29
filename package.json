@@ -1,0 +1,40 @@
+{
+  "name": "markov-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "ts-node index.ts",
+    "build": "tsc index.ts"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^13.4.0",
+    "markov-generator": "^1.2.3",
+    "sqlite": "^4.0.23",
+    "sqlite3": "^5.0.2"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.2.22",
+    "@types/mocha": "^9.0.0",
+    "@types/node": "^16.10.2",
+    "@types/sinon": "^10.0.4",
+    "@types/sinon-chai": "^3.2.5",
+    "@types/ws": "^8.2.0",
+    "@typescript-eslint/eslint-plugin": "^5.5.0",
+    "@typescript-eslint/parser": "^5.5.0",
+    "chai": "^4.2.0",
+    "eslint": "^8.4.0",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-plugin-prettier": "^4.0.0",
+    "mocha": "^9.1.2",
+    "prettier": "^2.4.1",
+    "rimraf": "^3.0.2",
+    "sinon": "^12.0.1",
+    "sinon-chai": "^3.5.0",
+    "standard-version": "^9.1.0",
+    "ts-node": "^10.0.0",
+    "typescript": "^4.4.3"
+  }
+}
