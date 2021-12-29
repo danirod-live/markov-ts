@@ -100,10 +100,13 @@ openDatabase().then((db) => {
     await deleteMessage(db, msg);
   });
   client.on("interactionCreate", async (i) => {
-    if (i.isCommand() && i.commandName === "markov") {
+    if (i.isApplicationCommand() && i.commandName === "markov") {
       await i.deferReply();
       try {
-        const markov = await generateChain(db, i.member.user.id);
+        const param = i.options.get("persona", false);
+        const target = param ? String(param.value) : i.user.id;
+        console.log(target);
+        const markov = await generateChain(db, target);
         i.followUp(markov);
       } catch (e) {
         const messages = [
