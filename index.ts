@@ -2,6 +2,8 @@ import {
   Client,
   Intents,
   Message,
+  MessageActionRow,
+  MessageButton,
   PartialMessage,
   Snowflake,
 } from "discord.js";
@@ -108,15 +110,43 @@ client.on("ready", () => {
 
 openDatabase().then((db) => {
   client.on("messageCreate", async (msg) => {
-    console.log("Registramos un mensaje nuevo");
-    await insertMessage(db, msg);
+    if (msg.author && msg.author.bot) {
+      console.log("Pero si es un puto bot");
+    } else {
+      console.log("Registramos un mensaje nuevo");
+      await insertMessage(db, msg);
+    }
   });
   client.on("messageDelete", async (msg) => {
-    console.log("Eliminamos un mensaje eliminado");
-    await deleteMessage(db, msg);
+    if (msg.author && msg.author.bot) {
+      console.log("Pero si es un puto bot");
+    } else {
+      console.log("Eliminamos un mensaje eliminado");
+      await deleteMessage(db, msg);
+    }
   });
   client.on("interactionCreate", async (i) => {
-    if (i.isApplicationCommand() && i.commandName === "markov") {
+    if (i.isButton() && i.customId === "compartir") {
+      const content = i.message.content;
+      await Promise.all([
+        i.channel && i.channel.send({ content }),
+        i.update({
+          content: "Listo :+1:",
+          components: [],
+        }),
+      ]);
+    } else if (i.isButton() && i.customId === "otro") {
+      const markov = await generateAnyChain(db);
+      await i.update({
+        content: markov,
+      });
+    } else if (i.isButton() && i.customId.startsWith("otro")) {
+      const target = i.customId.replace("otro:", "");
+      const markov = await generateChain(db, target);
+      await i.update({
+        content: markov,
+      });
+    } else if (i.isApplicationCommand() && i.commandName === "markov") {
       await i.deferReply({
         ephemeral: true,
       });
@@ -125,7 +155,25 @@ openDatabase().then((db) => {
         const target = param ? String(param.value) : i.user.id;
         console.log(target);
         const markov = await generateChain(db, target);
-        i.followUp(markov);
+        i.followUp({
+          content: markov,
+          components: [
+            new MessageActionRow({
+              components: [
+                new MessageButton({
+                  label: "Generar otro",
+                  style: "SECONDARY",
+                  customId: "otro:" + target,
+                }),
+                new MessageButton({
+                  label: "Compartir",
+                  style: "PRIMARY",
+                  customId: "compartir",
+                }),
+              ],
+            }),
+          ],
+        });
       } catch (e) {
         const messages = [
           "[El bot te mira con desaprobación]",
@@ -142,7 +190,25 @@ openDatabase().then((db) => {
       });
       try {
         const markov = await generateAnyChain(db);
-        i.followUp(markov);
+        i.followUp({
+          content: markov,
+          components: [
+            new MessageActionRow({
+              components: [
+                new MessageButton({
+                  label: "Generar otro",
+                  style: "SECONDARY",
+                  customId: "otro",
+                }),
+                new MessageButton({
+                  label: "Compartir",
+                  style: "PRIMARY",
+                  customId: "compartir",
+                }),
+              ],
+            }),
+          ],
+        });
       } catch (e) {
         const messages = [
           "[El bot te mira con desaprobación]",
