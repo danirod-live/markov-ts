@@ -129,7 +129,13 @@ openDatabase().then((db) => {
     if (i.isButton() && i.customId === "compartir") {
       const content = i.message.content;
       await Promise.all([
-        i.channel && i.channel.send({ content }),
+        i.channel &&
+          i.channel.send({
+            content: `${content}, generado por <@${i?.member?.user?.id}>`,
+            allowedMentions: {
+              parse: [],
+            },
+          }),
         i.update({
           content: "Listo :+1:",
           components: [],
@@ -142,9 +148,12 @@ openDatabase().then((db) => {
       });
     } else if (i.isButton() && i.customId.startsWith("otro")) {
       const target = i.customId.replace("otro:", "");
-      const markov = await generateChain(db, target);
+      const markov = await generateChain(db, target) + " -- <@" + target + ">";
       await i.update({
         content: markov,
+        allowedMentions: {
+          parse: [],
+        }
       });
     } else if (i.isApplicationCommand() && i.commandName === "markov") {
       await i.deferReply({
@@ -154,9 +163,13 @@ openDatabase().then((db) => {
         const param = i.options.get("persona", false);
         const target = param ? String(param.value) : i.user.id;
         console.log(target);
-        const markov = await generateChain(db, target);
+        const markov =
+          (await generateChain(db, target)) + " -- <@" + target + ">";
         i.followUp({
           content: markov,
+          allowedMentions: {
+            parse: [],
+          },
           components: [
             new MessageActionRow({
               components: [
@@ -192,6 +205,9 @@ openDatabase().then((db) => {
         const markov = await generateAnyChain(db);
         i.followUp({
           content: markov,
+          allowedMentions: {
+            parse: [],
+          },
           components: [
             new MessageActionRow({
               components: [
