@@ -117,7 +117,9 @@ openDatabase().then((db) => {
   });
   client.on("interactionCreate", async (i) => {
     if (i.isApplicationCommand() && i.commandName === "markov") {
-      await i.deferReply();
+      await i.deferReply({
+        ephemeral: true,
+      });
       try {
         const param = i.options.get("persona", false);
         const target = param ? String(param.value) : i.user.id;
@@ -135,7 +137,9 @@ openDatabase().then((db) => {
         i.followUp(message);
       }
     } else if (i.isApplicationCommand() && i.commandName === "markov-all") {
-      await i.deferReply();
+      await i.deferReply({
+        ephemeral: true,
+      });
       try {
         const markov = await generateAnyChain(db);
         i.followUp(markov);
