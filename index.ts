@@ -10,26 +10,38 @@ import {
 import { Database, open } from "sqlite";
 import * as sqlite3 from "sqlite3";
 
+function measure(name: string, func: Function): any {
+  const start = Date.now();
+  const outcome = func();
+  const end = Date.now();
+  console.log(`${end} | ${name}: ${end - start} ms`);
+  return outcome;
+}
+
 const MarkovGen = require("markov-generator");
 
 class Generator {
   private chain: any;
 
   constructor(corpus: string[]) {
-    this.chain = new MarkovGen({
-      input: corpus,
-      minLength: 10,
+    measure("new-chain", () => {
+      this.chain = new MarkovGen({
+        input: corpus,
+        minLength: 10,
+      });
     });
   }
 
   generate(): string {
-    const output: string = this.chain.makeChain();
-    const outputWithoutLineBreaks = output.replace(/(\r\n|\n|\r)/gm, " ");
-    if (outputWithoutLineBreaks.length > 300) {
-      const space = outputWithoutLineBreaks.indexOf(" ", 300);
-      return outputWithoutLineBreaks.substring(0, space);
-    }
-    return outputWithoutLineBreaks;
+    return measure("generate", () => {
+      const output: string = this.chain.makeChain();
+      const outputWithoutLineBreaks = output.replace(/(\r\n|\n|\r)/gm, " ");
+      if (outputWithoutLineBreaks.length > 300) {
+        const space = outputWithoutLineBreaks.indexOf(" ", 300);
+        return outputWithoutLineBreaks.substring(0, space);
+      }
+      return outputWithoutLineBreaks;
+    });
   }
 }
 
@@ -83,17 +95,21 @@ async function generateChain(
   database: Database,
   author: Snowflake
 ): Promise<Generator> {
-  const content = await database.all(
-    `SELECT content FROM chains WHERE chain_id = ?`,
-    author
-  );
-  const messages = content.map((c) => c.content);
+  const messages = await measure("generate-chain", async () => {
+    const content = await database.all(
+      `SELECT content FROM chains WHERE chain_id = ?`,
+      author
+    );
+    return content.map((c) => c.content);
+  });
   return new Generator(messages);
 }
 
 async function generateAnyChain(database: Database): Promise<Generator> {
-  const content = await database.all(`SELECT content FROM chains`);
-  const messages = content.map((c) => c.content);
+  const messages = await measure("generate-any-chain", async () => {
+    const content = await database.all(`SELECT content FROM chains`);
+    return content.map((c) => c.content);
+  });
   return new Generator(messages);
 }
 
@@ -196,6 +212,7 @@ openDatabase().then((db) => {
           });
         }
       } catch (e) {
+        console.error(e);
         const messages = [
           "[El bot te mira con desaprobación]",
           "[El bot se te queda mirando sin decir nada]",
@@ -249,6 +266,7 @@ openDatabase().then((db) => {
           });
         }
       } catch (e) {
+        console.error(e);
         const messages = [
           "[El bot te mira con desaprobación]",
           "[El bot se te queda mirando sin decir nada]",
