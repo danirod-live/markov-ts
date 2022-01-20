@@ -12,6 +12,27 @@ import * as sqlite3 from "sqlite3";
 
 const MarkovGen = require("markov-generator");
 
+class Generator {
+  private chain: any;
+
+  constructor(corpus: string[]) {
+    this.chain = new MarkovGen({
+      input: corpus,
+      minLength: 10,
+    });
+  }
+
+  generate(): string {
+    const output: string = this.chain.makeChain();
+    const outputWithoutLineBreaks = output.replace(/(\r\n|\n|\r)/gm, " ");
+    if (outputWithoutLineBreaks.length > 300) {
+      const space = outputWithoutLineBreaks.indexOf(" ", 300);
+      return outputWithoutLineBreaks.substring(0, space);
+    }
+    return outputWithoutLineBreaks;
+  }
+}
+
 const SETUP_SCRIPT = `
     CREATE TABLE IF NOT EXISTS "chains" (
         "event_id"	VARCHAR(48) NOT NULL,
@@ -61,33 +82,19 @@ async function deleteMessage(
 async function generateChain(
   database: Database,
   author: Snowflake
-): Promise<string> {
+): Promise<Generator> {
   const content = await database.all(
     `SELECT content FROM chains WHERE chain_id = ?`,
     author
   );
   const messages = content.map((c) => c.content);
-  return extractChain(messages);
+  return new Generator(messages);
 }
 
-function extractChain(corpus: string[]) {
-  const chain = new MarkovGen({
-    input: corpus,
-    minLength: 10,
-  });
-  const output: string = chain.makeChain();
-  const outputWithoutLineBreaks = output.replace(/(\r\n|\n|\r)/gm, " ");
-  if (outputWithoutLineBreaks.length > 300) {
-    const space = outputWithoutLineBreaks.indexOf(" ", 300);
-    return outputWithoutLineBreaks.substring(0, space);
-  }
-  return outputWithoutLineBreaks;
-}
-
-async function generateAnyChain(database: Database): Promise<string> {
+async function generateAnyChain(database: Database): Promise<Generator> {
   const content = await database.all(`SELECT content FROM chains`);
   const messages = content.map((c) => c.content);
-  return extractChain(messages);
+  return new Generator(messages);
 }
 
 if (!process.env.BOT_TOKEN) {
@@ -137,24 +144,10 @@ openDatabase().then((db) => {
             },
           }),
         i.update({
-          content: "Listo :+1:",
+          content: "Pues ya estaría :+1:",
           components: [],
         }),
       ]);
-    } else if (i.isButton() && i.customId === "otro") {
-      const markov = await generateAnyChain(db);
-      await i.update({
-        content: markov,
-      });
-    } else if (i.isButton() && i.customId.startsWith("otro")) {
-      const target = i.customId.replace("otro:", "");
-      const markov = await generateChain(db, target) + " -- <@" + target + ">";
-      await i.update({
-        content: markov,
-        allowedMentions: {
-          parse: [],
-        }
-      });
     } else if (i.isApplicationCommand() && i.commandName === "markov") {
       await i.deferReply({
         ephemeral: true,
@@ -162,48 +155,9 @@ openDatabase().then((db) => {
       try {
         const param = i.options.get("persona", false);
         const target = param ? String(param.value) : i.user.id;
-        console.log(target);
-        const markov =
-          (await generateChain(db, target)) + " -- <@" + target + ">";
-        i.followUp({
-          content: markov,
-          allowedMentions: {
-            parse: [],
-          },
-          components: [
-            new MessageActionRow({
-              components: [
-                new MessageButton({
-                  label: "Generar otro",
-                  style: "SECONDARY",
-                  customId: "otro:" + target,
-                }),
-                new MessageButton({
-                  label: "Compartir",
-                  style: "PRIMARY",
-                  customId: "compartir",
-                }),
-              ],
-            }),
-          ],
-        });
-      } catch (e) {
-        const messages = [
-          "[El bot te mira con desaprobación]",
-          "[El bot se te queda mirando sin decir nada]",
-          "[El bot mira tus manos, pero finalmente no dice nada]",
-          "[La IA del bot te mira como preguntándose quién eres]",
-        ];
-        const message = messages[Math.floor(Math.random() * messages.length)];
-        i.followUp(message);
-      }
-    } else if (i.isApplicationCommand() && i.commandName === "markov-all") {
-      await i.deferReply({
-        ephemeral: true,
-      });
-      try {
-        const markov = await generateAnyChain(db);
-        i.followUp({
+        const chain = await generateChain(db, target);
+        const markov = chain.generate() + " -- <@" + target + ">";
+        const message = await i.editReply({
           content: markov,
           allowedMentions: {
             parse: [],
@@ -225,6 +179,75 @@ openDatabase().then((db) => {
             }),
           ],
         });
+        if (i.channel) {
+          const collector = i.channel.createMessageComponentCollector({
+            componentType: "BUTTON",
+            filter: (btn) =>
+              btn.customId == "otro" && btn.message.id == message.id,
+          });
+          collector.on("collect", (e) => {
+            const markov = chain.generate() + " -- <@" + target + ">";
+            e.update({
+              content: markov,
+              allowedMentions: {
+                parse: [],
+              },
+            });
+          });
+        }
+      } catch (e) {
+        const messages = [
+          "[El bot te mira con desaprobación]",
+          "[El bot se te queda mirando sin decir nada]",
+          "[El bot mira tus manos, pero finalmente no dice nada]",
+          "[La IA del bot te mira como preguntándose quién eres]",
+        ];
+        const message = messages[Math.floor(Math.random() * messages.length)];
+        i.followUp(message);
+      }
+    } else if (i.isApplicationCommand() && i.commandName === "markov-all") {
+      await i.deferReply({
+        ephemeral: true,
+      });
+      try {
+        const markov = await generateAnyChain(db);
+        const message = await i.editReply({
+          content: markov.generate(),
+          allowedMentions: {
+            parse: [],
+          },
+          components: [
+            new MessageActionRow({
+              components: [
+                new MessageButton({
+                  label: "Generar otro",
+                  style: "SECONDARY",
+                  customId: "otro",
+                }),
+                new MessageButton({
+                  label: "Compartir",
+                  style: "PRIMARY",
+                  customId: "compartir",
+                }),
+              ],
+            }),
+          ],
+        });
+        if (i.channel) {
+          const collector = i.channel.createMessageComponentCollector({
+            componentType: "BUTTON",
+            filter: (btn) =>
+              btn.customId == "otro" && btn.message.id == message.id,
+          });
+          collector.on("collect", (e) => {
+            e.update({
+              content: markov.generate(),
+              allowedMentions: {
+                parse: [],
+              },
+            });
+          });
+        }
       } catch (e) {
         const messages = [
           "[El bot te mira con desaprobación]",
